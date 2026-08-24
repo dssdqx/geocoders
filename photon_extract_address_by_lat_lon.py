@@ -2,11 +2,18 @@ import os
 import time
 import requests
 import geopandas as gpd
+import logging
 
+logging.basicConfig(
+    level=logging.INFO, 
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 INPUT_PATH = r""
-OUTPUT_PATH = r""
 
+base, ext = os.path.splitext(INPUT_PATH)
+OUTPUT_PATH = f'{base}_photon_geocoded{ext}'
 
 # функция для обращения к Photon API (должен быть запущен локально на порту 2322) -> docker load -i photon-1.0.1.tar
 # возвращает словарь с адресом и его компонентами (улица, дом, город)
@@ -46,7 +53,7 @@ def photon_reverse(lat, lon):
         }
 
     except Exception as e:
-        print(f"Photon error: {e}")
+        logger.error(f"Photon error: {e}")
         return None
 
 
@@ -54,7 +61,7 @@ def photon_reverse(lat, lon):
 if not os.path.exists(INPUT_PATH):
     raise FileNotFoundError(INPUT_PATH)
 
-gdf = gpd.read_file(INPUT_PATH, driver = 'geojson')
+gdf = gpd.read_file(INPUT_PATH)
 
 
 fields = [
@@ -83,8 +90,8 @@ start = time.time()
 
 for i, (idx, centroid) in enumerate(zip(gdf.index, centroids), 1):
 
-    if i % 10000 == 0:
-        print(f"{i}/{total}")
+    if i % 100 == 0:
+        logger.info(f"{i}/{total} processed ")
 
     lon = centroid.x
     lat = centroid.y
@@ -100,8 +107,7 @@ for i, (idx, centroid) in enumerate(zip(gdf.index, centroids), 1):
 
 gdf.to_file(
     OUTPUT_PATH,
-    driver="GPKG",
-    layer="addresses"
+    driver="GeoJSON"
 )
 
-print(f"Сохранено: {OUTPUT_PATH}")
+logger.info(f"saved, file: {OUTPUT_PATH}")
